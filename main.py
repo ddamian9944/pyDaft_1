@@ -1,15 +1,14 @@
-from typing import Dict
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-
 app = FastAPI()
-app.counter = 0
-app.patients = {}
+counter: int = 0
+patients = []
 
 class MessageResp(BaseModel):
     message: str
-
+ 
 @app.get("/", response_model=MessageResp)
 def root():
     return MessageResp(message="Hello World during the coronavirus pandemic!")
@@ -33,28 +32,32 @@ def return_put_response():
 def return_delete_response():
     return MethodResp(method="DELETE")
 
-class AddNewPatient(BaseModel):
+class AddPatientRq(BaseModel):
     name: str
     surename: str
 
 
-class ReturnPatient(BaseModel):
-    id: int = app.counter
-    patient: Dict
+class AddPatientResp(BaseModel):
+    id: int
+    patient: AddPatientRq
 
 
-@app.post("/patient", response_model=ReturnPatient)
-def add_patient(patient_info: AddNewPatient):
-    _id = app.counter
-    app.patients[_id] = patient_info.dict()
-    counter()
-    return ReturnPatient(id=_id, patient=patient_info.dict())
+@app.post('/patient')
+def add_patient(patient: AddPatientRq):
+    global counter, patients
+
+    patient = AddPatientResp(id=counter, patient=patient)
+    patients.append(patient)
+    counter += 1
+    return patient
 
 
-@app.get("/patient/{pk}")
-def find_patient(pk: int):
-    if pk not in app.patients.keys():
-        raise HTTPException(
-            status_code=204,
-            detail="Patient with this id not found.")
-    return app.patients[pk]
+@app.get('/patient/{pk}')
+def get_patient(pk: int):
+    global patients
+
+    patient_resp = next((patient for patient in patients if patient.id == pk), None)
+    if patient_resp:
+        return patient_resp.patient
+    else:
+        return JSONResponse(status_code=204, content={})
